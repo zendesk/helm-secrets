@@ -141,7 +141,7 @@ vars_load() {
 
 sops_config() {
   #HELM_HOME=$(helm home)
-  DEC_SUFFIX=".dec"
+  DEC_SUFFIX="${DEC_SUFFIX-.dec}"
   SOPS_CONF_FILE=".sops.yaml"
 }
 
@@ -205,7 +205,11 @@ enc() {
 decrypt_helper() {
   file "$yml" > /dev/null || (echo "File not exist" && exit 1)
   sops_config
-  sops -d "$yml" > "${yml}${DEC_SUFFIX}"
+  if [ -z $DEC_SUFFIX ]; then
+    sops -d -i "$yml"
+  else
+    sops -d "$yml" > "${yml}${DEC_SUFFIX}"
+  fi
 }
 
 dec() {
