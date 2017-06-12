@@ -269,7 +269,7 @@ view_helper() {
 edit_helper() {
   file "$yml" > /dev/null || (echo "File not exist" && exit 1)
   sops_config
-  sops "$(which "$yml")"
+  sops $yml
 }
 
 view() {
