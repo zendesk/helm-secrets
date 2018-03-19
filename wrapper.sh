@@ -80,7 +80,7 @@ decrypt_helm_vars() {
 
 function cleanup {
   case "${CURRENT_COMMAND}" in
-    install|upgrade|rollback|template)
+    install|upgrade|rollback|template|lint|diff)
       echo -e "${YELLOW}>>>>>>${NOC} ${BLUE}Cleanup${NOC}"
       for file in "${@}";
       do
@@ -109,7 +109,7 @@ function helm_cmd {
 }
 
 case "${CURRENT_COMMAND}" in
-    install|upgrade|rollback|template)
+    install|upgrade|rollback|template|lint|diff)
         for file in "$@"
           do
              decrypt_helm_vars "$file"
