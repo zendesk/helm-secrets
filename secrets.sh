@@ -255,15 +255,13 @@ clean() {
   chart="$1"
   vars_load "$chart"
   basedir="$(dirname ${templates_dir})"
-  while read dec_file;
-  do
+  dec_file="${yml}${DEC_SUFFIX}"
   if [ -f "${dec_file}" ];
   then
      rm -v  "${dec_file}"
   else
      echo "Nothing to Clean"
   fi
-  done < <(find "${basedir}" -type f -name "*.yaml${DEC_SUFFIX}" )
 }
 
 view_helper() {
