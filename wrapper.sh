@@ -99,7 +99,7 @@ function cleanup {
 function helm_cmd {
     echo ""
     trap 'cleanup $@' INT TERM EXIT
-    $(echo "${HELM_CMD} $*" | sed -e 's/secrets.yaml/secrets.yaml.dec/g') >&3
+    $(echo "${HELM_CMD} $*" | sed -e 's/secrets.yaml/secrets.yaml.dec/g;s/secrets.yml/secrets.yml.dec/g') >&3
     local status=$?
     if [ "$status" -ne 0 ]; then
         echo ""
