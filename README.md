@@ -48,9 +48,9 @@ What kind of problems this plugin solves:
 ## Install
 
 #### SOPS install
-Just install plugin using ```helm plugin install https://github.com/futuresimple/helm-secrets``` and sops will be installed using hook when helm > 2.3.x
+Just install plugin using ```helm plugin install https://github.com/futuresimple/helm-secrets``` and sops will be installed using hook when helm > 2.3.x as part of it.
 
-You can always install manually for MacOS:
+You can always install manually for MacOS if you don't it like that:
 ```
 brew install sops
 ```
@@ -66,7 +66,7 @@ More info on [sops page](https://github.com/mozilla/sops#showing-diffs-in-cleart
 #### Using Helm plugin manager (> 2.3.x)
 
 ```
-helm plugin install https://github.com/futuresimple/helm-secrets
+helm plugin install https://github.com/futuresimple/helm-secrets as already stated above.
 ```
 
 #### Pre Helm 2.3.0 Installation
@@ -80,7 +80,7 @@ curl -L $TARBALL_URL | tar -C $(helm home)/plugins -xzv
 ```
 
 #### Helm-wrapper configuration
-By default helm-wrapper is not configured to encrypt/decrypt secrets.yaml in charts templates. They are templates and values from specific secrets/value files should e used in this templates as reference from helm itself.
+By default helm-wrapper is not configured to encrypt/decrypt secrets.yaml in charts templates. They are templates and values from specific secrets/value files should be used in this templates as reference from helm itself.
 Set you own options as ENV variables if you like overwrite default kms enabled and decrypt charts disabled.
 ```
 DECRYPT_CHARTS=false helm-wrapper ....
@@ -273,23 +273,23 @@ Deploy success helloworld-bff8fc4 in namespace projectx
 helm_vars/projectx/sandbox/us-east-1/java-app/helloworld/secrets.yaml.dec
 helm_vars/secrets.yaml.dec
 ```
-You can see that we use global secret file and specific for this app in this project/environment/region secret. We use some plain value files next to secrets. We use values from secrets in some secrets template in helloworld application chart template and some values are used in the configmap template in the same chart. Some values are added as env variables in deployment manifest templates in the chart. As you can see we can use secrets and values in helm in many ways. Everything depends on use case.
+You can see that we use a global secret file and specific for this app in this project/environment/region secret. We use some plain value files next to secrets. We use values from secrets in some secrets template in helloworld application chart template and some values are used in the configmap template in the same chart. Some values are added as env variables in deployment manifest templates in the chart. As you can see we can use secrets and values in helm in many ways. Everything depends on use case.
 
 Even when helm failed then decrypted files are cleaned
 ```
 AWS_PROFILE=sandbox helm-wrapper upgrade \
-  helloworld \
-  stable/java-app \
-  --install \
-  --timeout 600 \
-  --wait \
-  --kube-context=wrongcontext \
-  --namespace=projectx \
-  --set global.app_version=bff8fc4 \
-  -f helm_vars/projectx/sandbox/us-east-1/java-app/helloworld/secrets.yaml \
-  -f helm_vars/projectx/sandbox/us-east-1/java-app/helloworld/values.yaml \
-  -f helm_vars/secrets.yaml \
-  -f helm_vars/values.yaml
+helloworld \
+stable/java-app \
+--install \
+--timeout 600 \
+--wait \
+--kube-context=wrongcontext \
+--namespace=projectx \
+--set global.app_version=bff8fc4 \
+-f helm_vars/projectx/sandbox/us-east-1/java-app/helloworld/secrets.yaml \
+-f helm_vars/projectx/sandbox/us-east-1/java-app/helloworld/values.yaml \
+-f helm_vars/secrets.yaml \
+-f helm_vars/values.yaml
 
 >>>>>> Decrypt
 Decrypting helm_vars/projectx/sandbox/us-east-1/java-app/helloworld/secrets.yaml
@@ -310,15 +310,15 @@ For example in your charts repo you have ```stable/helloworld/``` inside this ch
 apiVersion: v1
 kind: Secret
 metadata:
-  name: helloworld
-  labels:
-    app: helloworld
-    chart: "{{ .Chart.Name }}-{{ .Chart.Version }}"
-    release: "{{ .Release.Name }}"
-    heritage: "{{ .Release.Service }}"
+name: helloworld
+labels:
+app: helloworld
+chart: "{{ .Chart.Name }}-{{ .Chart.Version }}"
+release: "{{ .Release.Name }}"
+heritage: "{{ .Release.Service }}"
 type: Opaque
 data:
-  my_secret_key: {{ .Values.secret_sandbox_helloworld | b64enc | quote }}
+my_secret_key: {{ .Values.secret_sandbox_helloworld | b64enc | quote }}
 ```
 In this example you will have Kubernetes secret created with name helloworld and data inside this secret will be filled from values defined in ```-f helm_vars/projectx/sandbox/us-east-1/java-app/helloworld/secrets.yaml```. Then we use plain ```.Values ``` pointing to key ```secret_sandbox_helloworld``` in decrypted secret file and value from this decrypted ```helm_vars/projectx/sandbox/us-east-1/java-app/helloworld/secrets.yaml``` will be available as ```my_secret_key``` in Kubernetes.
 
@@ -328,20 +328,20 @@ apiVersion: extensions/v1beta1
 kind: Deployment
 ...
 ...
-        containers:
-        ...
-        ...
-          env:
-            - name: my_new_secret_key
-              valueFrom:
-                secretKeyRef:
-                  name: helloworld
-                  key: my_secret_key
+containers:
+...
+...
+env:
+- name: my_new_secret_key
+valueFrom:
+secretKeyRef:
+name: helloworld
+key: my_secret_key
 ```
 ## Tips
 
 #### Prevent committing decrypted files to git
-If you like to secure situation when decrypted file is committed by mistake to git you can add your secrets.yaml.dec files to you charts project .gitignore
+If you like to secure a situation when a decrypted file is committed by mistake to git you can add your secrets.yaml.dec files to you charts project .gitignore
 
 As the second level of securing this situation is to add for example ```.sopscommithook``` file inside your charts repository local commit hook.
 This will prevent committing decrypted files without sops metadata.
@@ -351,11 +351,11 @@ This will prevent committing decrypted files without sops metadata.
 #!/bin/sh
 
 for FILE in $(git diff-index HEAD --name-only | grep <your vars dir> | grep "secrets.y"); do
-    if [ -f "$FILE" ] && ! grep -C10000 "sops:" $FILE | grep -q "version:"; then
-        echo "!!!!! $FILE" 'File is not encrypted !!!!!'
-        echo "Run: helm secrets enc <file path>"
-        exit 1
-    fi
+if [ -f "$FILE" ] && ! grep -C10000 "sops:" $FILE | grep -q "version:"; then
+echo "!!!!! $FILE" 'File is not encrypted !!!!!'
+echo "Run: helm secrets enc <file path>"
+exit 1
+fi
 done
 exit
 ```
