@@ -223,11 +223,12 @@ encrypt_helper() {
     fi
     if [[ $yml == $ymldec ]]
     then
-	sops --encrypt --input-type yaml --output-type yaml --in-place "$yml"
+	sops --encrypt --input-type yaml --output-type yaml --in-place "$yml" && \
 	echo "Encrypted $yml"
     else
-	sops --encrypt --input-type yaml --output-type yaml "$ymldec" > "$yml"
-	echo "Encrypted $ymldec to $yml"
+	sops --encrypt --input-type yaml --output-type yaml "$ymldec" > "$yml" && \
+	echo "Encrypted $ymldec to $yml" && \
+	rm $ymldec
     fi
 }
 
@@ -339,7 +340,7 @@ clean() {
 	return
     fi
     local basedir="$1"
-    find "$basedir" -type f -name "secrets*${DEC_SUFFIX}" -print0 | xargs -r0 rm -v
+    find "$basedir" -type f -name "secrets*${DEC_SUFFIX}" -print -exec rm {} \;
 }
 
 helm_wrapper() {
