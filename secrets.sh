@@ -344,6 +344,7 @@ clean() {
 }
 
 helm_wrapper() {
+    trap 'last_error_code=$?' ERR
     local cmd="$1" subcmd='' cmd_version=''
     shift
     if [[ $cmd == diff ]]
@@ -396,7 +397,7 @@ EOF
 	case "$1" in
 	    --)
 		# skip --, and what remains are the cmd args
-		shift 
+		shift
 		break
 		;;
             -f|--values)
@@ -425,6 +426,9 @@ EOF
 
     # cleanup on-the-fly decrypted files
     [[ ${#decfiles[@]} -gt 0 ]] && rm -v "${decfiles[@]}"
+
+    exit $last_error_code
+
 }
 
 helm_command() {
