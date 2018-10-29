@@ -91,7 +91,7 @@ echo -e "${YELLOW}+++${NOC} Encrypt and Test"
 test_encryption "${secret}"
 
 echo -e "${YELLOW}+++${NOC} Test if 'Already Encrypted' feature works"
-enc_res=$("${HELM_CMD}" secrets enc "${secret}" | grep "${ALREADY_ENC}")
+enc_res=$("${HELM_CMD}" secrets enc "${secret}" | grep -i "${ALREADY_ENC}")
 test_already_encrypted "${enc_res}"
 
 echo -e "${YELLOW}+++${NOC} View encrypted Test"

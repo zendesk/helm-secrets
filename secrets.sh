@@ -223,11 +223,12 @@ encrypt_helper() {
     fi
     if [[ $yml == $ymldec ]]
     then
-	sops --encrypt --input-type yaml --output-type yaml --in-place "$yml"
+	sops --encrypt --input-type yaml --output-type yaml --in-place "$yml" && \
 	echo "Encrypted $yml"
     else
-	sops --encrypt --input-type yaml --output-type yaml "$ymldec" > "$yml"
-	echo "Encrypted $ymldec to $yml"
+	sops --encrypt --input-type yaml --output-type yaml "$ymldec" > "$yml" && \
+	echo "Encrypted $ymldec to $yml" && \
+	rm $ymldec
     fi
 }
 
@@ -339,10 +340,11 @@ clean() {
 	return
     fi
     local basedir="$1"
-    find "$basedir" -type f -name "secrets*${DEC_SUFFIX}" -print0 | xargs -r0 rm -v
+    find "$basedir" -type f -name "secrets*${DEC_SUFFIX}" -print -exec rm {} \;
 }
 
 helm_wrapper() {
+    trap 'last_error_code=$?' ERR
     local cmd="$1" subcmd='' cmd_version=''
     shift
     if [[ $cmd == diff ]]
@@ -395,7 +397,7 @@ EOF
 	case "$1" in
 	    --)
 		# skip --, and what remains are the cmd args
-		shift 
+		shift
 		break
 		;;
             -f|--values)
@@ -424,6 +426,9 @@ EOF
 
     # cleanup on-the-fly decrypted files
     [[ ${#decfiles[@]} -gt 0 ]] && rm -v "${decfiles[@]}"
+
+    exit $last_error_code
+
 }
 
 helm_command() {
