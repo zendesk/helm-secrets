@@ -2,7 +2,7 @@
 
 # The suffix to use for decrypted files. The default can be overridden using
 # the HELM_SECRETS_DEC_SUFFIX environment variable.
-DEC_SUFFIX="${HELM_SECRETS_DEC_SUFFIX:-.yaml.dec}"
+DEC_SUFFIX="${HELM_SECRETS_DEC_SUFFIX:-.dec}"
 
 # Make sure HELM_BIN is set (normally by the helm command)
 HELM_BIN="${HELM_BIN:-helm}"
@@ -210,24 +210,26 @@ is_help() {
 
 encrypt_helper() {
     local dir=$(dirname "$1")
-    local yml=$(basename "$1")
+    local file=$(basename "$1")
+    local type=${file:(-4)}
+
     cd "$dir"
-    [[ -e "$yml" ]] || { echo "File does not exist: $dir/$yml"; exit 1; }
-    local ymldec=$(sed -e "s/\\.yaml$/${DEC_SUFFIX}/" <<<"$yml")
-    [[ -e $ymldec ]] || ymldec="$yml"
-    
-    if [[ $(grep -C10000 'sops:' "$ymldec" | grep -c 'version:') -gt 0 ]]
+    [[ -e "$file" ]] || { echo "File does not exist: $dir/$file"; exit 1; }
+    local file_dec=$(sed -e "s/\\.$type$/.$type${DEC_SUFFIX}/" <<<"$file")
+    [[ -e $file_dec ]] || file_dec="$file"
+
+    if [[ $(grep -C10000 'sops:' "$file_dec" | grep -c 'version:') -gt 0 ]]
     then
-	echo "Already encrypted: $ymldec"
+	echo "Already encrypted: $file_dec"
 	return
     fi
-    if [[ $yml == $ymldec ]]
+    if [[ $file == $file_dec ]]
     then
-	sops --encrypt --input-type yaml --output-type yaml --in-place "$yml"
-	echo "Encrypted $yml"
+	sops --encrypt --input-type $type --output-type $type --in-place "$file"
+	echo "Encrypted $file"
     else
-	sops --encrypt --input-type yaml --output-type yaml "$ymldec" > "$yml"
-	echo "Encrypted $ymldec to $yml"
+	sops --encrypt --input-type $type --output-type $type "$file_dec" > "$file"
+	echo "Encrypted $file_dec to $file"
     fi
 }
 
@@ -237,52 +239,52 @@ enc() {
 	enc_usage
 	return
     fi
-    yml="$1"
-    if [[ ! -f "$yml" ]]
+    file="$1"
+    if [[ ! -f "$file" ]]
     then
-	echo "$yml doesn't exist."
+	echo "$file doesn't exist."
     else
-	echo "Encrypting $yml"
-	encrypt_helper "$yml"
+	echo "Encrypting $file"
+	encrypt_helper "$file"
     fi
 }
 
 # Name references ("declare -n" and "local -n") are a Bash 4 feature.
 # For previous versions, work around using eval.
 decrypt_helper() {
-    local yml="$1" __ymldec __dec
-
+    local file="$1" __filedec __dec
+    local type=${file:(-4)}
     if [[ ${BASH_VERSINFO[0]} -lt 4 ]]
     then
-	local __ymldec_var='' __dec_var=''
-	[[ $# -ge 2 ]] && __ymldec_var=$2
+	local __filedec_var='' __dec_var=''
+	[[ $# -ge 2 ]] && __filedec_var=$2
 	[[ $# -ge 3 ]] && __dec_var=$3
 	[[ $__dec_var ]] && eval $__dec_var=0
     else
-	[[ $# -ge 2 ]] && local -n __ymldec=$2
+	[[ $# -ge 2 ]] && local -n __filedec=$2
 	[[ $# -ge 3 ]] && local -n __dec=$3
     fi
 
     __dec=0
-    [[ -e "$yml" ]] || { echo "File does not exist: $yml"; exit 1; }
-    if [[ $(grep -C10000 'sops:' "$yml" | grep -c 'version:') -eq 0 ]]
+    [[ -e "$file" ]] || { echo "File does not exist: $file"; exit 1; }
+    if [[ $(grep -C10000 'sops' "$file" | grep -c 'version') -eq 0 ]]
     then
-	echo "Not encrypted: $yml"
-	__ymldec="$yml"
+	echo "Not encrypted: $file"
+	__filedec="$file"
     else
-	__ymldec=$(sed -e "s/\\.yaml$/${DEC_SUFFIX}/" <<<"$yml")
-	if [[ -e $__ymldec && $__ymldec -nt $yml ]]
+	__filedec=$(sed -e "s/\\.$type$/.$type${DEC_SUFFIX}/" <<<"$file")
+	if [[ -e $__filedec && $__filedec -nt $file ]]
 	then
-	    echo "$__ymldec is newer than $yml"
+	    echo "$__filedec is newer than $file"
 	else
-	    sops --decrypt --input-type yaml --output-type yaml "$yml" > "$__ymldec" || { rm "$__ymldec"; exit 1; }
+	    sops --decrypt --input-type $type --output-type type "$file" > "$__filedec" || { rm "$__filedec"; exit 1; }
 	    __dec=1
 	fi
     fi
 
     if [[ ${BASH_VERSINFO[0]} -lt 4 ]]
     then
-	[[ $__ymldec_var ]] && eval $__ymldec_var="'$__ymldec'"
+	[[ $__filedec_var ]] && eval $__filedec_var="'$__filedec'"
 	[[ $__dec_var ]] && eval $__dec_var="'$__dec'"
     fi
     true # just so that decrypt_helper will exit with a true status on no error
@@ -295,20 +297,21 @@ dec() {
 	dec_usage
 	return
     fi
-    yml="$1"
-    if [[ ! -f "$yml" ]]
+    file="$1"
+    if [[ ! -f "$file" ]]
     then
-	echo "$yml doesn't exist."
+	echo "$file doesn't exist."
     else
-	echo "Decrypting $yml"
-	decrypt_helper "$yml"
+	echo "Decrypting $file"
+	decrypt_helper "$file"
     fi
 }
 
 view_helper() {
-    local yml="$1"
-    [[ -e "$yml" ]] || { echo "File does not exist: $yml"; exit 1; }
-    sops --decrypt --input-type yaml --output-type yaml "$yml"
+    local file="$1"
+    local type=${file:(-4)}
+    [[ -e "$file" ]] || { echo "File does not exist: $file"; exit 1; }
+    sops --decrypt --input-type $type --output-type yaml "$file"
 }
 
 view() {
@@ -317,19 +320,20 @@ view() {
 	view_usage
 	return
     fi
-    local yml="$1"
-    view_helper "$yml"
+    local file="$1"
+    view_helper "$file"
 }
 
 edit_helper() {
-    local yml="$1"
-    [[ -e "$yml" ]] || { echo "File does not exist: $yml"; exit 1; }
-    exec sops --input-type yaml --output-type yaml "$yml" < /dev/tty
+    local file="$1"
+    local type=${file:(-4)}
+    [[ -e "$file" ]] || { echo "File does not exist: $file"; exit 1; }
+    exec sops --input-type $type --output-type $type "$file" < /dev/tty
 }
 
 edit() {
-    local yml="$1"
-    edit_helper "$yml"
+    local file="$1"
+    edit_helper "$file"
 }
 
 clean() {
@@ -339,7 +343,7 @@ clean() {
 	return
     fi
     local basedir="$1"
-    find "$basedir" -type f -name "secrets*${DEC_SUFFIX}" -print0 | xargs -r0 rm -v
+    find "$basedir" -type f -name "*${DEC_SUFFIX}" -print0 | xargs -r0 rm -v
 }
 
 helm_wrapper() {
@@ -400,14 +404,14 @@ EOF
 		;;
             -f|--values)
 		cmdopts+=("$1")
-		yml="$2"
-		if [[ $yml =~ ^(.*/)?secrets(\.[^.]+)*\.yaml$ ]]
+		file="$2"
+		if [[ $file =~ ^(.*/)?secrets(\.[^.]+)*\.yaml$ ]] || [[ $file =~ ^(.*/)?secrets(\.[^.]+)*\.json$ ]]
 		then
-		    decrypt_helper $yml ymldec decrypted
-		    cmdopts+=("$ymldec")
-		    [[ $decrypted -eq 1 ]] && decfiles+=("$ymldec")
+		    decrypt_helper $file filedec decrypted
+		    cmdopts+=("$filedec")
+		    [[ $decrypted -eq 1 ]] && decfiles+=("$filedec")
 		else
-		    cmdopts+=("$yml")
+		    cmdopts+=("$file")
 		fi
 		shift # to also skip option arg
 		;;
