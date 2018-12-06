@@ -43,6 +43,7 @@ Available Commands:
   lint		wrapper that decrypts secrets[.*].yaml files before running helm lint
   diff		wrapper that decrypts secrets[.*].yaml files before running helm diff
                   (diff is a helm plugin)
+  template      wrapper that decrypts secrets[.*].yaml files before running helm template
 
 EOF
 }
@@ -193,6 +194,23 @@ Example:
 
 Typical usage:
   $ ${HELM_BIN} secrets diff upgrade i1 stable/nginx-ingress -f values.test.yaml -f secrets.test.yaml
+
+EOF
+}
+
+template_usage() {
+    cat <<EOF
+Render chart templates locally and display the output.
+
+This is a wrapper for the "helm template" command. It will detect -f and
+--values options, and decrypt any secrets.*.yaml files before running "helm
+template".
+
+Example:
+  $ ${HELM_BIN} secrets template <HELM TEMPLATE OPTIONS>
+
+Typical usage:
+  $ ${HELM_BIN} secrets template -n i1 stable/nginx-ingress -f values.test.yaml -f secrets.test.yaml
 
 EOF
 }
@@ -483,7 +501,7 @@ case "${1:-help}" in
 	fi
 	clean "$2"
 	;;
-    install|upgrade|lint|diff)
+    install|upgrade|lint|diff|template)
 	helm_command "$@"
 	;;
     --help|-h|help)
