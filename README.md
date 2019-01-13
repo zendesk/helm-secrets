@@ -108,6 +108,7 @@ Available Commands:
   lint          wrapper that decrypts secrets[.*].yaml files before running helm lint
   diff          wrapper that decrypts secrets[.*].yaml files before running helm diff
                   (diff is a helm plugin)
+  template      wrapper that decrypts secrets[.*].yaml files before running helm template
 ```
 
 By convention, files containing secrets are named `secrets.yaml`, or anything beginning with "secrets." and ending with ".yaml". E.g. `secrets.test.yaml` and `secrets.prod.yaml`.
@@ -276,6 +277,7 @@ Running helm to install/upgrade chart with our secrets files is simple with the 
   upgrade       run "helm upgrade" with decrypted secrets files
   lint          run "helm lint" with decrypted secrets files
   diff          run "helm diff" with decrypted secrets files
+  template      run "helm template" with decrypted secrets files
 ```
 
 The wrapper enables you to call these helm commands with on-the-fly decryption of secrets files passed as `-f` or `--values` arguments. Instead of calling e.g. `helm install ...` you can call `helm secrets install ...` to get on-the-fly decryption.
