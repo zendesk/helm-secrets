@@ -40,6 +40,7 @@ Available Commands:
   clean         Remove all decrypted files in specified directory (recursively)
   install	wrapper that decrypts secrets[.*].yaml files before running helm install
   upgrade	wrapper that decrypts secrets[.*].yaml files before running helm upgrade
+  template	wrapper that decrypts secrets[.*].yaml files before running helm template
   lint		wrapper that decrypts secrets[.*].yaml files before running helm lint
   diff		wrapper that decrypts secrets[.*].yaml files before running helm diff
                   (diff is a helm plugin)
@@ -483,7 +484,7 @@ case "${1:-help}" in
 	fi
 	clean "$2"
 	;;
-    install|upgrade|lint|diff)
+    install|upgrade|lint|diff|template)
 	helm_command "$@"
 	;;
     --help|-h|help)
