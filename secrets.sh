@@ -33,6 +33,27 @@ DEC_SUFFIX="${HELM_SECRETS_DEC_SUFFIX:-.yaml.dec}"
 # Make sure HELM_BIN is set (normally by the helm command)
 HELM_BIN="${HELM_BIN:-helm}"
 
+# The secret store to use to store values
+# Defaults to "secret/helm"
+if [[ -z "${VAULT_PATH}" ]]
+then
+    default=secret/helm
+    read -p "Enter a Vault KV Store path [$default]: " VAULT_PATH
+    VAULT_PATH=${VAULT_PATH:-$default}
+    unset default
+fi
+
+# The plaintext deliminator used to specify which values need to be stored in Vault
+# Defaults to "changme"
+if [[ -z "${secret_deliminator}" ]]
+then
+    default=changeme
+    read -p "Enter a secret deliminator [$default]: " secret_deliminator
+    secret_deliminator=${secret_deliminator:-$default}
+    echo "Secret Deliminator is $secret_deliminator"
+    unset default
+fi
+
 getopt --test > /dev/null
 if [[ $? -ne 4 ]]
 then
@@ -86,7 +107,7 @@ You can use plain sops to encrypt - https://github.com/mozilla/sops
 Vault secrets
 
 If VAULT_TOKEN env variable is set, automatically store values in Vault.
-Secret values must be entered into the helm chart as `changeme`, for example
+Secret values must be entered into the helm chart as a specific vaule, in this case "changme", for example
 
   db:
     name: nextcloud
@@ -306,8 +327,31 @@ parse_yaml() {
 # Based on https://github.com/jasperes/bash-yaml
 create_variables() {
     local yaml_file="$1"
-    eval "$(parse_yaml "$yaml_file" | awk '/changeme/{print $0}')"
-    eval "$(parse_yaml "$yaml_file" | awk '/image_repository/{print $0}')"
+    eval "$(parse_yaml "$yaml_file" | awk -v secret_deliminator="$secret_deliminator" '$0 ~ secret_deliminator {print}')"
+}
+
+# Get file path from root of Git repo to provide a well defined location to store secrets
+get_path() {
+    repository_path=`git rev-parse --show-prefix`
+    repository_path=`echo $repository_path | sed 's/.$//'`
+}
+
+# Cleans the environment variable array to remove the "secret_deliminator" variable from being returned
+clean_array() {
+    delete=(secret_deliminator)
+    for target in "${delete[@]}"; do
+        for i in "${!envsarray[@]}"; do
+            if [[ ${envsarray[i]} = "${delete[0]}" ]]; then
+                unset 'envsarray[i]'
+            fi
+        done
+    done
+
+    for i in "${!envsarray[@]}"; do
+        new_envsarray+=( "${envsarray[i]}" )
+    done
+    envsarray=("${new_envsarray[@]}")
+    unset new_envsarray
 }
 
 # Prompts user for secret material and uploads to vault K/V Store
@@ -317,13 +361,18 @@ set_secrets() {
     envsarray=()
     while IFS= read -r line; do
         envsarray+=( "$line" )
-    done < <( set -o posix +o allexport; set | grep "changeme" | awk 'match($0, "\.=") {print substr($0, 1, RSTART)}' )
+    done < <( set -o posix +o allexport; set | grep "$secret_deliminator" | awk 'match($0, "\.=") {print substr($0, 1, RSTART)}' )
+
+    clean_array
 
     for env in "${envsarray[@]}";
     do
-        echo "Enter a secret value for $image_repository/$env"
-        read -r usersecret
-        vault kv put secret/helm/$image_repository/$env value=$usersecret
+        echo "Enter a secret value for $env"
+        echo "Stored at $VAULT_PATH/$repository_path/$yml/$env"
+        stty -echo
+        read -r usersecret;
+        stty echo
+        vault kv put $VAULT_PATH/$repository_path/$yml/$env value=$usersecret
     done
 }
 
@@ -334,19 +383,20 @@ get_secrets() {
     envsarray=()
     while IFS= read -r line; do
         envsarray+=( "$line" )
-    done < <( set -o posix +o allexport; set | grep "changeme" | awk 'match($0, "\.=") {print substr($0, 1, RSTART)}' )
+    done < <( set -o posix +o allexport; set | grep "$secret_deliminator" | awk 'match($0, "\.=") {print substr($0, 1, RSTART)}' )
+
+    clean_array
 
     yml_dec="$yml.dec"
     cp $yml $yml_dec
 
     for env in "${envsarray[@]}";
     do
-        sec_values=`vault kv get secret/helm/$image_repository/$env | grep "value" | awk '/value/{print $2}'`
-        echo "Secret Values = $sec_values"
+        sec_values=`vault kv get $VAULT_PATH/$repository_path/$yml/$env | grep "value" | awk '/value/{print $2}'`
         for sec in "${sec_values[@]}";
         do
-            #this will fail if "changeme" is on the first line of the file, but is required for GNU sed
-            sed -i.dec "1,// s/changeme/$sec/" $yml_dec
+            #this will fail if "$secret_delminator" is on the first line of the file, but is required for GNU sed
+            sed -i.dec "1,// s/$secret_deliminator/$sec/" $yml_dec
             rm "$yml_dec.dec"
         done
     done
@@ -376,6 +426,7 @@ encrypt_helper() {
         echo "Encrypted $ymldec to $yml"
         fi
     else
+        get_path
         create_variables $yml
         set_secrets
     fi
@@ -440,6 +491,7 @@ decrypt_helper() {
         fi
         true # just so that decrypt_helper will exit with a true status on no error
     else
+        get_path
         create_variables $yml
         get_secrets
     fi
