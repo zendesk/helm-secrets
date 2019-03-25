@@ -1,4 +1,30 @@
 #!/usr/bin/env bash
+# shellcheck disable=SC1003
+
+# Parts of this project are MIT Licensed, they will be denoted below.
+
+# MIT License
+
+# Original work Copyright (c) 2017 Jonathan Peres
+# Modified work Copyright (c) 2019 Just_Insane
+
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
 
 # The suffix to use for decrypted files. The default can be overridden using
 # the HELM_SECRETS_DEC_SUFFIX environment variable.
@@ -6,6 +32,27 @@ DEC_SUFFIX="${HELM_SECRETS_DEC_SUFFIX:-.yaml.dec}"
 
 # Make sure HELM_BIN is set (normally by the helm command)
 HELM_BIN="${HELM_BIN:-helm}"
+
+# The secret store to use to store values
+# Defaults to "secret/helm"
+if [[ -z "${VAULT_PATH}" ]]
+then
+    default=secret/helm
+    read -p "Enter a Vault KV Store path [$default]: " VAULT_PATH
+    VAULT_PATH=${VAULT_PATH:-$default}
+    unset default
+fi
+
+# The plaintext deliminator used to specify which values need to be stored in Vault
+# Defaults to "changme"
+if [[ -z "${secret_deliminator}" ]]
+then
+    default=changeme
+    read -p "Enter a secret deliminator [$default]: " secret_deliminator
+    secret_deliminator=${secret_deliminator:-$default}
+    echo "Secret Deliminator is $secret_deliminator"
+    unset default
+fi
 
 getopt --test > /dev/null
 if [[ $? -ne 4 ]]
@@ -57,6 +104,18 @@ This allows you to first decrypt the file, edit it, then encrypt it again.
 
 You can use plain sops to encrypt - https://github.com/mozilla/sops
 
+Vault secrets
+
+If VAULT_TOKEN env variable is set, automatically store values in Vault.
+Secret values must be entered into the helm chart as a specific vaule, in this case "changme", for example
+
+  db:
+    name: nextcloud
+    user: nextcloud
+    password: changeme
+
+would prompt to enter a value for the db password.
+
 Example:
   $ ${HELM_BIN} secrets enc <SECRET_FILE_PATH>
   $ git add <SECRET_FILE_PATH>
@@ -74,6 +133,18 @@ It uses your gpg credentials to decrypt previously encrypted .yaml file.
 Produces ${DEC_SUFFIX} file.
 
 You can use plain sops to decrypt specific files - https://github.com/mozilla/sops
+
+Vault secrets
+
+If VAULT_TOKEN env variable is set, automatically pull values from Vault in a plaintext file.
+Values must be pulled in order to update or install via Helm.
+
+For example:
+
+ db:
+    name: nextcloud
+    user: nextcloud
+    password: <value entered during enc command>
 
 Example:
   $ ${HELM_BIN} secrets dec <SECRET_FILE_PATH>
@@ -208,6 +279,129 @@ is_help() {
     esac
 }
 
+# Parses yaml document
+# Based on https://github.com/jasperes/bash-yaml
+parse_yaml() {
+    local yaml_file=$1
+    local s
+    local w
+    local fs
+
+    s='[[:space:]]*'
+    w='[a-zA-Z0-9_.-]*'
+    fs="$(echo @|tr @ '\034')"
+
+    (
+        sed -e '/- [^\“]'"[^\']"'.*: /s|\([ ]*\)- \([[:space:]]*\)|\1-\'$'\n''  \1\2|g' |
+
+        sed -ne '/^--/s|--||g; s|\"|\\\"|g; s/[[:space:]]*$//g;' \
+            -e "/#.*[\"\']/!s| #.*||g; /^#/s|#.*||g;" \
+            -e "s|^\($s\)\($w\)$s:$s\"\(.*\)\"$s\$|\1$fs\2$fs\3|p" \
+            -e "s|^\($s\)\($w\)${s}[:-]$s\(.*\)$s\$|\1$fs\2$fs\3|p" |
+
+        awk -F"$fs" '{
+            indent = length($1)/2;
+            if (length($2) == 0) { conj[indent]="+";} else {conj[indent]="";}
+            vname[indent] = $2;
+            for (i in vname) {if (i > indent) {delete vname[i]}}
+                if (length($3) > 0) {
+                    vn=""; for (i=0; i<indent; i++) {vn=(vn)(vname[i])("_")}
+                    printf("%s%s%s%s=(\"%s\")\n", "",vn, $2, conj[indent-1],$3);
+                }
+            }' |
+
+        sed -e 's/_=/+=/g' |
+
+        awk 'BEGIN {
+                FS="=";
+                OFS="="
+            }
+            /(-|\.).*=/ {
+                gsub("-|\\.", "_", $1)
+            }
+            { print }'
+    ) < "$yaml_file"
+}
+
+# Created environment variables for secrets key invocations as well as the image repository
+# Based on https://github.com/jasperes/bash-yaml
+create_variables() {
+    local yaml_file="$1"
+    eval "$(parse_yaml "$yaml_file" | awk -v secret_deliminator="$secret_deliminator" '$0 ~ secret_deliminator {print}')"
+}
+
+# Get file path from root of Git repo to provide a well defined location to store secrets
+get_path() {
+    repository_path=`git rev-parse --show-prefix`
+    repository_path=`echo $repository_path | sed 's/.$//'`
+}
+
+# Cleans the environment variable array to remove the "secret_deliminator" variable from being returned
+clean_array() {
+    delete=(secret_deliminator)
+    for target in "${delete[@]}"; do
+        for i in "${!envsarray[@]}"; do
+            if [[ ${envsarray[i]} = "${delete[0]}" ]]; then
+                unset 'envsarray[i]'
+            fi
+        done
+    done
+
+    for i in "${!envsarray[@]}"; do
+        new_envsarray+=( "${envsarray[i]}" )
+    done
+    envsarray=("${new_envsarray[@]}")
+    unset new_envsarray
+}
+
+# Prompts user for secret material and uploads to vault K/V Store
+set_secrets() {
+    report () { echo "${1%%=*}"; };
+
+    envsarray=()
+    while IFS= read -r line; do
+        envsarray+=( "$line" )
+    done < <( set -o posix +o allexport; set | grep "$secret_deliminator" | awk 'match($0, "\.=") {print substr($0, 1, RSTART)}' )
+
+    clean_array
+
+    for env in "${envsarray[@]}";
+    do
+        echo "Enter a secret value for $env"
+        echo "Stored at $VAULT_PATH/$repository_path/$yml/$env"
+        stty -echo
+        read -r usersecret;
+        stty echo
+        vault kv put $VAULT_PATH/$repository_path/$yml/$env value=$usersecret
+    done
+}
+
+# Pulls secret material from vault K/V store and saves it to a .dec file, needed by helm to update or deploy
+get_secrets() { 
+    report () { echo "${1%%=*}"; };
+
+    envsarray=()
+    while IFS= read -r line; do
+        envsarray+=( "$line" )
+    done < <( set -o posix +o allexport; set | grep "$secret_deliminator" | awk 'match($0, "\.=") {print substr($0, 1, RSTART)}' )
+
+    clean_array
+
+    yml_dec="$yml.dec"
+    cp $yml $yml_dec
+
+    for env in "${envsarray[@]}";
+    do
+        sec_values=`vault kv get $VAULT_PATH/$repository_path/$yml/$env | grep "value" | awk '/value/{print $2}'`
+        for sec in "${sec_values[@]}";
+        do
+            #this will fail if "$secret_delminator" is on the first line of the file, but is required for GNU sed
+            sed -i.dec "1,// s/$secret_deliminator/$sec/" $yml_dec
+            rm "$yml_dec.dec"
+        done
+    done
+}
+
 encrypt_helper() {
     local dir=$(dirname "$1")
     local yml=$(basename "$1")
@@ -216,18 +410,25 @@ encrypt_helper() {
     local ymldec=$(sed -e "s/\\.yaml$/${DEC_SUFFIX}/" <<<"$yml")
     [[ -e $ymldec ]] || ymldec="$yml"
     
-    if [[ $(grep -C10000 'sops:' "$ymldec" | grep -c 'version:') -gt 0 ]]
+    if [[ -z "${VAULT_TOKEN}" ]]
     then
-	echo "Already encrypted: $ymldec"
-	return
-    fi
-    if [[ $yml == $ymldec ]]
-    then
-	sops --encrypt --input-type yaml --output-type yaml --in-place "$yml"
-	echo "Encrypted $yml"
+        if [[ $(grep -C10000 'sops:' "$ymldec" | grep -c 'version:') -gt 0 ]]
+        then
+        echo "Already encrypted: $ymldec"
+        return
+        fi
+        if [[ $yml == $ymldec ]]
+        then
+        sops --encrypt --input-type yaml --output-type yaml --in-place "$yml"
+        echo "Encrypted $yml"
+        else
+        sops --encrypt --input-type yaml --output-type yaml "$ymldec" > "$yml"
+        echo "Encrypted $ymldec to $yml"
+        fi
     else
-	sops --encrypt --input-type yaml --output-type yaml "$ymldec" > "$yml"
-	echo "Encrypted $ymldec to $yml"
+        get_path
+        create_variables $yml
+        set_secrets
     fi
 }
 
@@ -265,27 +466,35 @@ decrypt_helper() {
 
     __dec=0
     [[ -e "$yml" ]] || { echo "File does not exist: $yml"; exit 1; }
-    if [[ $(grep -C10000 'sops:' "$yml" | grep -c 'version:') -eq 0 ]]
-    then
-	echo "Not encrypted: $yml"
-	__ymldec="$yml"
-    else
-	__ymldec=$(sed -e "s/\\.yaml$/${DEC_SUFFIX}/" <<<"$yml")
-	if [[ -e $__ymldec && $__ymldec -nt $yml ]]
-	then
-	    echo "$__ymldec is newer than $yml"
-	else
-	    sops --decrypt --input-type yaml --output-type yaml "$yml" > "$__ymldec" || { rm "$__ymldec"; exit 1; }
-	    __dec=1
-	fi
-    fi
 
-    if [[ ${BASH_VERSINFO[0]} -lt 4 ]]
+    if [[ -z "${VAULT_TOKEN}" ]]
     then
-	[[ $__ymldec_var ]] && eval $__ymldec_var="'$__ymldec'"
-	[[ $__dec_var ]] && eval $__dec_var="'$__dec'"
+        if [[ $(grep -C10000 'sops:' "$yml" | grep -c 'version:') -eq 0 ]]
+        then
+        echo "Not encrypted: $yml"
+        __ymldec="$yml"
+        else
+        __ymldec=$(sed -e "s/\\.yaml$/${DEC_SUFFIX}/" <<<"$yml")
+        if [[ -e $__ymldec && $__ymldec -nt $yml ]]
+        then
+            echo "$__ymldec is newer than $yml"
+        else
+            sops --decrypt --input-type yaml --output-type yaml "$yml" > "$__ymldec" || { rm "$__ymldec"; exit 1; }
+            __dec=1
+        fi
+        fi
+
+        if [[ ${BASH_VERSINFO[0]} -lt 4 ]]
+        then
+        [[ $__ymldec_var ]] && eval $__ymldec_var="'$__ymldec'"
+        [[ $__dec_var ]] && eval $__dec_var="'$__dec'"
+        fi
+        true # just so that decrypt_helper will exit with a true status on no error
+    else
+        get_path
+        create_variables $yml
+        get_secrets
     fi
-    true # just so that decrypt_helper will exit with a true status on no error
 }
 
 
