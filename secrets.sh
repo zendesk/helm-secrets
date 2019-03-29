@@ -10,13 +10,30 @@ HELM_BIN="${HELM_BIN:-helm}"
 getopt --test > /dev/null
 if [[ $? -ne 4 ]]
 then
-    cat <<EOF
+    # Check if gnu-getopt is installed
+    if [ -x /usr/local/opt/gnu-getopt/bin/getopt ]
+    then
+        /usr/local/opt/gnu-getopt/bin/getopt --test > /dev/null
+        if [[ $? -ne 4 ]]
+	then
+	    GNU_GETOPT=0
+	else
+	    GNU_GETOPT=1
+	    export PATH="/usr/local/opt/gnu-getopt/bin:$PATH"
+	fi
+    else
+    	GNU_GETOPT=0
+    fi
+    
+    if [ "${GNU_GETOPT}" -ne 1 ]; then
+    	cat <<EOF
 I’m sorry, "getopt --test" failed in this environment.
 
 You may need to install enhanced getopt, e.g. on OSX using
 "brew install gnu-getopt".
 EOF
-    exit 1
+    	exit 1
+    fi
 fi
 
 set -ueo pipefail
@@ -39,6 +56,7 @@ Available Commands:
   edit   	Edit secrets file and encrypt afterwards
   clean         Remove all decrypted files in specified directory (recursively)
   install	wrapper that decrypts secrets[.*].yaml files before running helm install
+  template	wrapper that decrypts secrets[.*].yaml files before running helm template
   upgrade	wrapper that decrypts secrets[.*].yaml files before running helm upgrade
   lint		wrapper that decrypts secrets[.*].yaml files before running helm lint
   diff		wrapper that decrypts secrets[.*].yaml files before running helm diff
@@ -142,6 +160,23 @@ Example:
 
 Typical usage:
   $ ${HELM_BIN} secrets install -n i1 stable/nginx-ingress -f values.test.yaml -f secrets.test.yaml
+
+EOF
+}
+
+template_usage() {
+    cat <<EOF
+Install a chart
+
+This is a wrapper for the "helm template" command. It will detect -f and
+--values options, and decrypt any secrets.*.yaml files before running "helm
+template".
+
+Example:
+  $ ${HELM_BIN} secrets template <HELM INSTALL OPTIONS>
+
+Typical usage:
+  $ ${HELM_BIN} secrets template -n i1 stable/nginx-ingress -f values.test.yaml -f secrets.test.yaml
 
 EOF
 }
@@ -256,10 +291,13 @@ enc() {
     fi
 }
 
-# Name references ("declare -n" and "local -n") are a Bash 4 feature.
+# Name references ("declare -n" and "local -n") are a Bash 4.3+ feature.
 # For previous versions, work around using eval.
 decrypt_helper() {
-    if [[ ${BASH_VERSINFO[0]} -lt 4 ]]
+
+    local yml="$1" __ymldec __dec
+
+    if [[ ${BASH_VERSINFO[0]} -lt 4 || ${BASH_VERSINFO[0]} -eq 4 && ${BASH_VERSINFO[1]} -lt 3 ]]
     then
 	local __ymldec_var='' __dec_var=''
 	[[ $# -ge 2 ]] && __ymldec_var=$2
@@ -291,7 +329,7 @@ decrypt_helper() {
 	fi
     fi
 
-    if [[ ${BASH_VERSINFO[0]} -lt 4 ]]
+    if [[ ${BASH_VERSINFO[0]} -lt 4 || ${BASH_VERSINFO[0]} -eq 4 && ${BASH_VERSINFO[1]} -lt 3 ]]
     then
 	[[ $__ymldec_var ]] && eval $__ymldec_var="'$__ymldec'"
 	[[ $__dec_var ]] && eval $__dec_var="'$__dec'"
@@ -350,7 +388,7 @@ clean() {
 	return
     fi
     local basedir="$1"
-    find "$basedir" -type f -name "secrets*${DEC_SUFFIX}" -print0 | xargs -r0 rm -v
+    find "$basedir" -type f -name "secrets*${DEC_SUFFIX}" -exec rm -v {} \;
 }
 
 helm_wrapper() {
@@ -432,7 +470,7 @@ EOF
     # run helm command with args and opts in correct order
     set +e # ignore errors
     ${HELM_BIN} ${TILLER_HOST:+--host "$TILLER_HOST" }"$cmd" $subcmd "$@" "${cmdopts[@]}"
-
+    helm_exit_code=$?
     # cleanup on-the-fly decrypted files
     [[ ${#decfiles[@]} -gt 0 ]] && rm -v "${decfiles[@]}"
 }
@@ -494,7 +532,7 @@ case "${1:-help}" in
 	fi
 	clean "$2"
 	;;
-    install|upgrade|lint|diff)
+    install|template|upgrade|lint|diff)
 	helm_command "$@"
 	;;
     --help|-h|help)
@@ -505,5 +543,4 @@ case "${1:-help}" in
 	exit 1
 	;;
 esac
-
-exit 0
+exit ${helm_exit_code:-0}
