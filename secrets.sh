@@ -2,7 +2,7 @@
 
 # The suffix to use for decrypted files. The default can be overridden using
 # the HELM_SECRETS_DEC_SUFFIX environment variable.
-DEC_SUFFIX="${HELM_SECRETS_DEC_SUFFIX:-.yaml.dec}"
+DEC_SUFFIX="${HELM_SECRETS_DEC_SUFFIX:-.dec}"
 
 # Make sure HELM_BIN is set (normally by the helm command)
 HELM_BIN="${HELM_BIN:-helm}"
@@ -69,9 +69,10 @@ enc_usage() {
     cat <<EOF
 Encrypt secrets
 
-It uses your gpg credentials to encrypt .yaml file. If the file is already
-encrypted, look for a decrypted ${DEC_SUFFIX} file and encrypt that to .yaml.
+It uses your gpg credentials to encrypt a file. If the file is already
+encrypted, look for a decrypted ${DEC_SUFFIX} file and encrypt that.
 This allows you to first decrypt the file, edit it, then encrypt it again.
+Recognizes *.yaml extensions and to encrypt as a tree instead of a blob.
 
 You can use plain sops to encrypt - https://github.com/mozilla/sops
 
@@ -88,7 +89,7 @@ dec_usage() {
     cat <<EOF
 Decrypt secrets
 
-It uses your gpg credentials to decrypt previously encrypted .yaml file.
+It uses your gpg credentials to decrypt a previously encrypted file.
 Produces ${DEC_SUFFIX} file.
 
 You can use plain sops to decrypt specific files - https://github.com/mozilla/sops
@@ -105,7 +106,7 @@ EOF
 
 view_usage() {
     cat <<EOF
-View specified secrets[.*].yaml file
+View specified secrets[.*] file
 
 Example:
   $ ${HELM_BIN} secrets view <SECRET_FILE_PATH>
@@ -152,7 +153,7 @@ install_usage() {
 Install a chart
 
 This is a wrapper for the "helm install" command. It will detect -f and
---values options, and decrypt any secrets.*.yaml files before running "helm
+--values options, and decrypt any secrets.* files before running "helm
 install".
 
 Example:
@@ -186,7 +187,7 @@ upgrade_usage() {
 Upgrade a deployed release
 
 This is a wrapper for the "helm upgrade" command. It will detect -f and
---values options, and decrypt any secrets.*.yaml files before running "helm
+--values options, and decrypt any secrets.* files before running "helm
 upgrade".
 
 Example:
@@ -202,9 +203,9 @@ lint_usage() {
     cat <<EOF
 Run helm lint on a chart
 
-This is a wrapper for the "helm lint" command. It will detect -f and
---values options, and decrypt any secrets.*.yaml files before running "helm
-lint".
+This is a wrapper for the "helm lint" command. It will detect -f,
+--values, and --set-files options, and decrypt any secrets.* files before
+running "helm lint".
 
 Example:
   $ ${HELM_BIN} secrets lint <HELM LINT OPTIONS>
@@ -220,8 +221,8 @@ diff_usage() {
 Run helm diff on a chart
 
 "diff" is a helm plugin. This is a wrapper for the "helm diff" command. It
-will detect -f and --values options, and decrypt any secrets.*.yaml files
-before running "helm diff".
+will detect -f, --values, and --set-file options, and decrypt any secrets.*
+files before running "helm diff".
 
 Example:
   $ ${HELM_BIN} secrets diff <HELM DIFF OPTIONS>
@@ -248,20 +249,24 @@ encrypt_helper() {
     local yml=$(basename "$1")
     cd "$dir"
     [[ -e "$yml" ]] || { echo "File does not exist: $dir/$yml"; exit 1; }
-    local ymldec=$(sed -e "s/\\.yaml$/${DEC_SUFFIX}/" <<<"$yml")
+    local ymldec=$(sed -e "s/$/${DEC_SUFFIX}/" <<<"$yml")
     [[ -e $ymldec ]] || ymldec="$yml"
     
-    if [[ $(grep -C10000 'sops:' "$ymldec" | grep -c 'version:') -gt 0 ]]
+    if [[ $(egrep -C10000 'sops["]?:' "$ymldec" | egrep -c 'version["]?:') -gt 0 ]]
     then
 	echo "Already encrypted: $ymldec"
 	return
     fi
+    if [[ "$yml" =~ .yaml$ ]]
+    then
+        local type_params="--input-type yaml --output-type yaml"
+    fi
     if [[ $yml == $ymldec ]]
     then
-	sops --encrypt --input-type yaml --output-type yaml --in-place "$yml"
+	sops --encrypt ${type_params} --in-place "$yml"
 	echo "Encrypted $yml"
     else
-	sops --encrypt --input-type yaml --output-type yaml "$ymldec" > "$yml"
+	sops --encrypt ${type_params} "$ymldec" > "$yml"
 	echo "Encrypted $ymldec to $yml"
     fi
 }
@@ -300,17 +305,22 @@ decrypt_helper() {
 
     __dec=0
     [[ -e "$yml" ]] || { echo "File does not exist: $yml"; exit 1; }
-    if [[ $(grep -C10000 'sops:' "$yml" | grep -c 'version:') -eq 0 ]]
+    if [[ $(egrep -C10000 'sops["]?:' "$yml" | egrep -c 'version["]?:') -eq 0 ]]
     then
 	echo "Not encrypted: $yml"
 	__ymldec="$yml"
     else
-	__ymldec=$(sed -e "s/\\.yaml$/${DEC_SUFFIX}/" <<<"$yml")
+	__ymldec=$(sed -e "s/$/${DEC_SUFFIX}/" <<<"$yml")
 	if [[ -e $__ymldec && $__ymldec -nt $yml ]]
 	then
 	    echo "$__ymldec is newer than $yml"
 	else
-	    sops --decrypt --input-type yaml --output-type yaml "$yml" > "$__ymldec" || { rm "$__ymldec"; exit 1; }
+		if [[ "$yml" =~ .yaml$ ]]
+		then
+			sops --decrypt --input-type yaml --output-type yaml "$yml" > "$__ymldec" || { rm "$__ymldec"; exit 1; }
+		else
+			sops --decrypt "$yml" > "$__ymldec" || { rm "$__ymldec"; exit 1; }
+		fi
 	    __dec=1
 	fi
     fi
@@ -343,7 +353,12 @@ dec() {
 view_helper() {
     local yml="$1"
     [[ -e "$yml" ]] || { echo "File does not exist: $yml"; exit 1; }
+    if [[ "$yml" =~ .yaml$ ]]
+    then
     sops --decrypt --input-type yaml --output-type yaml "$yml"
+    else
+    sops --decrypt "$yml"
+    fi
 }
 
 view() {
@@ -359,7 +374,12 @@ view() {
 edit_helper() {
     local yml="$1"
     [[ -e "$yml" ]] || { echo "File does not exist: $yml"; exit 1; }
+    if [[ "$yml" =~ .yaml$ ]]
+    then
     exec sops --input-type yaml --output-type yaml "$yml" < /dev/tty
+	else
+    exec sops "$yml" < /dev/tty
+	fi
 }
 
 edit() {
@@ -443,6 +463,19 @@ EOF
 		    [[ $decrypted -eq 1 ]] && decfiles+=("$ymldec")
 		else
 		    cmdopts+=("$yml")
+		fi
+		shift # to also skip option arg
+		;;
+            --set-file)
+		cmdopts+=("$1")
+		yml="${2#*=}"
+		if [[ $yml =~ ^(.*/)?secrets ]]
+		then
+		    decrypt_helper $yml ymldec decrypted
+		    cmdopts+=("${2%=*}=$ymldec")
+		    [[ $decrypted -eq 1 ]] && decfiles+=("$ymldec")
+		else
+		    cmdopts+=("$2")
 		fi
 		shift # to also skip option arg
 		;;

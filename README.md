@@ -105,16 +105,16 @@ Available Commands:
   view          Print secrets decrypted
   edit          Edit secrets file and encrypt afterwards
   clean         Remove all decrypted files in specified directory (recursively)
-  install       wrapper that decrypts secrets[.*].yaml files before running helm install
-  upgrade       wrapper that decrypts secrets[.*].yaml files before running helm upgrade
-  lint          wrapper that decrypts secrets[.*].yaml files before running helm lint
-  diff          wrapper that decrypts secrets[.*].yaml files before running helm diff
+  install       wrapper that decrypts secrets[.*] files before running helm install
+  upgrade       wrapper that decrypts secrets[.*] files before running helm upgrade
+  lint          wrapper that decrypts secrets[.*] files before running helm lint
+  diff          wrapper that decrypts secrets[.*] files before running helm diff
                   (diff is a helm plugin)
 ```
 
-By convention, files containing secrets are named `secrets.yaml`, or anything beginning with "secrets." and ending with ".yaml". E.g. `secrets.test.yaml` and `secrets.prod.yaml`.
+By convention, files containing secrets are named `secrets.*`.  Anything ending with ".yaml" will be treated as a yaml file and encrypted as a tree rather than a blob. E.g. `secrets.test.yaml` and `secrets.prod.yaml`.
 
-Decrypted files have the suffix ".yaml.dec" by default. This can be changed using the `HELM_SECRETS_DEC_SUFFIX` environment variable.
+Decrypted files have the suffix ".dec" by default. This can be changed using the `HELM_SECRETS_DEC_SUFFIX` environment variable.
 
 #### Basic commands:
 ```
@@ -122,7 +122,7 @@ Decrypted files have the suffix ".yaml.dec" by default. This can be changed usin
   dec           Decrypt secrets file
   view          Print decrypted secrets file
   edit          Edit secrets file (decrypt before and encrypt after)
-  clean         Delete *.yaml-dec files in directory (recursively)
+  clean         Delete *.dec files in directory (recursively)
 ```
 Each of these commands have their own help.
 
@@ -134,7 +134,7 @@ Note: You need to run `gpg --import example/pgp/project{x,y}.asc` in order to su
 
 ##### Decrypt
 
-The decrypt operation decrypts a secrets.yaml file and saves the decrypted result in secrets.yaml.dec:
+The decrypt operation decrypts a secrets.* file and saves the decrypted result in secrets.*.dec:
 ```
 $ helm secrets dec example/helm_vars/projectX/sandbox/us-east-1/java-app/secrets.yaml
 Decrypting example/helm_vars/projectX/sandbox/us-east-1/java-app/secrets.yaml
@@ -154,9 +154,9 @@ example/helm_vars/projectX/sandbox/us-east-1/java-app/secrets.yaml.dec is newer 
 
 ##### Encrypt
 
-The encrypt operation encrypts a secrets.yaml.dec file and saves the encrypted result in secrets.yaml:
+The encrypt operation encrypts a secrets.*.dec file and saves the encrypted result in secrets.*:
 
-If you initially have an unencrypted secrets.yaml file, it will be used as input and will be overwritten:
+If you initially have an unencrypted secrets.* file, it will be used as input and will be overwritten:
 
 ```
 $ helm secrets enc example/helm_vars/projectX/sandbox/us-east-1/java-app/secrets.yaml
@@ -164,7 +164,7 @@ Encrypting example/helm_vars/projectX/sandbox/us-east-1/java-app/secrets.yaml
 Encrypted example/helm_vars/projectX/sandbox/us-east-1/java-app/secrets.yaml
 ```
 
-If you already have an encrypted secrets.yaml file and a decrypted secrets.yaml.dec file, encrypting will encrypt secrets.yaml.dec to secrets.yaml:
+If you already have an encrypted secrets.* file and a decrypted secrets.*.dec file, encrypting will encrypt secrets.*.dec to secrets.*:
 ```
 $ helm secrets dec example/helm_vars/projectX/sandbox/us-east-1/java-app/secrets.yaml
 Decrypting example/helm_vars/projectX/sandbox/us-east-1/java-app/secrets.yaml
@@ -173,13 +173,13 @@ Encrypting example/helm_vars/projectX/sandbox/us-east-1/java-app/secrets.yaml
 Encrypted example/helm_vars/projectX/sandbox/us-east-1/java-app/secrets.yaml.dec to example/helm_vars/projectX/sandbox/us-east-1/java-app/secrets.yaml
 ```
 ##### View
-The view operation decrypts secrets.yaml and prints it to stdout:
+The view operation decrypts secrets.* and prints it to stdout:
 ```
 $ helm secrets view example/helm_vars/projectX/sandbox/us-east-1/java-app/secrets.yaml
 secret_sandbox_projectx: secret_foo_123
 ```
 ##### Edit
-The edit operation will decrypt the secrets.yaml file and open it in an editor. If the file is modified, it will be encrypted again after you exit the editor.
+The edit operation will decrypt the secrets.* file and open it in an editor. If the file is modified, it will be encrypted again after you exit the editor.
 
 ```
 $ helm secrets edit example/helm_vars/projectX/sandbox/us-east-1/java-app/secrets.yaml
@@ -195,13 +195,13 @@ $ helm secrets clean example/helm_vars/projectX/sandbox/us-east-1/java-app/
 removed example/helm_vars/projectX/sandbox/us-east-1/java-app/secrets.yaml.dec
 ```
 
-If you use git there is commit hook that prevents commiting decrypted files and you can add all *.yaml.dec files in you repository ```.gitignore``` file.
+If you use git there is commit hook that prevents commiting decrypted files and you can add all *.dec files in you repository ```.gitignore``` file.
 
 #### Summary
 
 * Values/Secrets data are not a part of the chart. You need to manage your values, public charts contains mostly defaults without secrets - data vs code
 * To use the helm-secrets plugin you should build your ```.sops.yaml``` rules to make everything automatic
-* Use helm secrets <enc|dec|view|edit> for everyday work with you secret yaml files
+* Use helm secrets <enc|dec|view|edit> for everyday work with you secret files
 * Use version control systems like GIT to work in teams and get history of versions
 * Everyday search keys is simple even with encrypted files or decrypt on-the-fly with git diff config included
 * With example helm_vars you can manage multiple world locations with multiple projects that contain multiple environments
