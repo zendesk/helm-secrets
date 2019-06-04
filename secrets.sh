@@ -255,23 +255,24 @@ find_sops() {
 encrypt_helper() {
     local sops_dir=$(find_sops "$1")
     local yml=$(realpath --relative-to $(find_sops "$1") $(realpath "$1"))
+    [[ -e "$yml" ]] || { echo "File does not exist: $yml"; exit 1; }
     local ymldec=$(sed -e "s/\\.yaml$/${DEC_SUFFIX}/" <<<"$yml")
     cd "$sops_dir"
 
     [[ -e $ymldec ]] || ymldec="$yml"
-    
+
     if [[ $(grep -C10000 'sops:' "$ymldec" | grep -c 'version:') -gt 0 ]]
     then
-	echo "Already encrypted: $ymldec"
-	return
+        echo "Already encrypted: $ymldec"
+        return
     fi
     if [[ $yml == $ymldec ]]
     then
-	sops --encrypt --input-type yaml --output-type yaml --in-place "$yml"
-	echo "Encrypted $yml"
+        sops --encrypt --input-type yaml --output-type yaml --in-place "$yml"
+        echo "Encrypted $yml"
     else
-	sops --encrypt --input-type yaml --output-type yaml "$ymldec" > "$yml"
-	echo "Encrypted $ymldec to $yml"
+        sops --encrypt --input-type yaml --output-type yaml "$ymldec" > "$yml"
+        echo "Encrypted $ymldec to $yml"
     fi
 }
 
@@ -450,6 +451,10 @@ EOF
             -f|--values)
 		cmdopts+=("$1")
 		yml="$2"
+		# increase support for -f=myfile.yaml or -f=myfile (helm support both spaces and equal sign)
+		if [[ $yml =~ ^=.*$ ]]; then
+		    yml="${yml/=/}"
+		fi
 		if [[ $yml =~ ^(.*/)?secrets(\.[^.]+)*\.yaml$ ]]
 		then
 		    decrypt_helper $yml ymldec decrypted
