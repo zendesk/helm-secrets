@@ -438,11 +438,11 @@ EOF
 		if [[ $yml =~ ^=.*$ ]]; then
 		    yml="${yml/=/}"
 		fi
-		if [[ $yml =~ ^(.*/)?secrets(\.[^.]+)*\.yaml$ ]]
+		if [[ $yml =~ ^(.*/)?secrets([_.-][^.]+)*\.yaml$ ]]
 		then
 		    decrypt_helper $yml ymldec decrypted
 		    cmdopts+=("$ymldec")
-		    [[ $decrypted -eq 1 ]] && decfiles+=("$ymldec")
+		    [[ $decrypted -eq 1 ]] && decfiles+=("$ymldec") && echo "DECRYPTED $yml temporarily"
 		else
 		    cmdopts+=("$yml")
 		fi
