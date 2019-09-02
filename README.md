@@ -185,7 +185,7 @@ The edit operation will decrypt the secrets.yaml file and open it in an editor. 
 ```
 $ helm secrets edit example/helm_vars/projectX/sandbox/us-east-1/java-app/secrets.yaml
 ```
-There is new feature in SOPS master that allows using $EDITOR to spcify editor used by sops but not released yet.
+There is new feature in SOPS master that allows using $EDITOR to specify editor used by sops but not released yet.
 
 ##### Clean
 
