@@ -460,7 +460,9 @@ EOF
     ${HELM_BIN} ${TILLER_HOST:+--host "$TILLER_HOST" }"$cmd" $subcmd "$@" "${cmdopts[@]}"
     helm_exit_code=$?
     # cleanup on-the-fly decrypted files
-    [[ ${#decfiles[@]} -gt 0 ]] && rm -v "${decfiles[@]}"
+    local rmflags=(-v)
+    if [ "$cmd" == "template" ]; then rmflags=(); fi
+    [[ ${#decfiles[@]} -gt 0 ]] && rm "${rmflags[@]}" "${decfiles[@]}"
 }
 
 helm_command() {
