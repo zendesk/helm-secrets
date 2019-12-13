@@ -50,7 +50,7 @@ else
             brew install sops
     elif [ "$(uname)" == "Linux" ];
     then
-        if [ which dpkg ] && [ ${NOROOT} == "false" ];
+        if [ "$(which dpkg)" ] && [ "${NOROOT}" == "false" ];
         then
             curl -sL "${SOPS_DEB_URL}" > /tmp/sops
             if [ "$(get_sha_256 /tmp/sops)" == "${SOPS_DEB_SHA}" ];
@@ -64,7 +64,14 @@ else
             if [ "$(get_sha_256 /tmp/sops)" == "${SOPS_LINUX_SHA}" ];
             then
                 chmod +x /tmp/sops
-                mv /tmp/sops /usr/local/bin/
+
+                if [ "${NOROOT}" == "true" ];
+                then
+                    mkdir $HOME/bin
+                    mv /tmp/sops $HOME/bin    
+                else
+                    mv /tmp/sops /usr/local/bin/
+                fi
             else
                 echo -e "${RED}Wrong SHA256${NOC}"
             fi
