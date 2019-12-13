@@ -50,7 +50,7 @@ else
             brew install sops
     elif [ "$(uname)" == "Linux" ];
     then
-        if [ which dpkg ] & [ ${NOROOT} == "false" ];
+        if [ which dpkg ] && [ ${NOROOT} == "false" ];
         then
             curl -sL "${SOPS_DEB_URL}" > /tmp/sops
             if [ "$(get_sha_256 /tmp/sops)" == "${SOPS_DEB_SHA}" ];
