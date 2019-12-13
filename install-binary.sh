@@ -7,7 +7,7 @@ SOPS_DEB_URL="https://github.com/mozilla/sops/releases/download/${SOPS_VERSION}/
 SOPS_DEB_SHA="9d9f319882ba05e7050be91bdfc396167ac9b00e2e6f634a647d55ac97915bb6"
 SOPS_LINUX_URL="https://github.com/mozilla/sops/releases/download/${SOPS_VERSION}/sops-${SOPS_VERSION}.linux"
 SOPS_LINUX_SHA="e185d2752defdcb18c054f67682a6684c72d6a6bf2341f6bef1dd7d33a110459"
-NOROOT="false"
+NOROOT="${NOROOT:=false}"
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -50,7 +50,7 @@ else
             brew install sops
     elif [ "$(uname)" == "Linux" ];
     then
-        if [ "$(which dpkg)" ] && [ "${NOROOT}" == "false" ];
+        if [ "$(which dpkg)" ] && [ "${NOROOT}" == false ];
         then
             curl -sL "${SOPS_DEB_URL}" > /tmp/sops
             if [ "$(get_sha_256 /tmp/sops)" == "${SOPS_DEB_SHA}" ];
@@ -65,9 +65,12 @@ else
             then
                 chmod +x /tmp/sops
 
-                if [ "${NOROOT}" == "true" ];
+                if [ "${NOROOT}" == true ];
                 then
-                    mkdir $HOME/bin
+                    if [ ! -d "$HOME/bin" ];
+                    then
+                        mkdir $HOME/bin
+                    fi
                     mv /tmp/sops $HOME/bin    
                 else
                     mv /tmp/sops /usr/local/bin/
