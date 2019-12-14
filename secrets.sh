@@ -61,7 +61,8 @@ Available Commands:
   lint		wrapper that decrypts secrets[.*].yaml files before running helm lint
   diff		wrapper that decrypts secrets[.*].yaml files before running helm diff
                   (diff is a helm plugin)
-
+  kubeval	wrapper that decrypts secrets[.*].yaml files before running helm kubeval
+                  (kubeval is a helm plugin)		  
 EOF
 }
 
@@ -232,6 +233,23 @@ Typical usage:
 EOF
 }
 
+kubeval_usage() {
+    cat <<EOF
+Run helm kubeval on a chart
+
+"kubeval" is a helm plugin. This is a wrapper for the "helm kubeval" command. It
+will detect -f and --values options, and decrypt any secrets.*.yaml files
+before running "helm kubeval".
+
+Example:
+  $ ${HELM_BIN} secrets kubeval <HELM KUBEVAL OPTIONS>
+
+Typical usage:
+  $ ${HELM_BIN} secrets kubeval . -f values.test.yaml -f secrets.test.yaml
+
+EOF
+}
+
 is_help() {
     case "$1" in
 	-h|--help|help)
@@ -383,6 +401,11 @@ helm_wrapper() {
 	subcmd="$1"
 	shift
 	cmd_version=$(${HELM_BIN} diff version)
+    elif [[ $cmd == kubeval ]]
+    then
+	subcmd="$1"
+	shift
+	cmd_version=$(${HELM_BIN} kubeval --version)
     fi
 
     # cache options for the helm command in a file so we don't need to parse the help each time
@@ -520,7 +543,7 @@ case "${1:-help}" in
 	fi
 	clean "$2"
 	;;
-    install|template|upgrade|lint|diff)
+    install|template|upgrade|lint|diff|kubeval)
 	helm_command "$@"
 	;;
     --help|-h|help)
