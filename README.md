@@ -414,3 +414,9 @@ for FILE in $(git diff-index HEAD --name-only | grep <your vars dir> | grep "sec
 done
 exit
 ```
+
+## Copyright and license
+
+Copyright 2017 Zendesk
+
+Licensed under the [Apache License, Version 2.0](LICENSE)
