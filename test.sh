@@ -62,7 +62,7 @@ ymldec=$(sed -e "s/\\.y\(a\|\)ml$/.yaml.dec/" <<<"$secret")
 
 if [ -f "${ymldec}" ];
 then
-    
+
     result_dec=$(cat < "${ymldec}" | grep -Ec "(40B6FAEC80FD467E3FE9421019F6A67BB1B8DDBE|4434EA5D05F10F59D0DF7399AF1D073646ED4927)")
     if [ "${result_dec}" -gt 0 ];
     then
@@ -82,7 +82,14 @@ then
     echo -e "${RED}[FAIL]${NOC} ${secret_dec} exist after cleanup"
     exit 1
 else
-    echo -e "${GREEN}[OK]${NOC} Cleanup ${mode}"
+    echo "looking in $(dirname ${secret_dec})/no-secret.yaml.dec"
+    if [ ! -f "$(dirname ${secret_dec})/no-secret.yaml.dec" ];
+    then
+        echo -e "${RED}[FAIL]${NOC} no-secret.yaml.dec has been deleted"
+        exit 1
+    else
+        echo -e "${GREEN}[OK]${NOC} Cleanup ${mode}"
+    fi
 fi
 }
 
@@ -115,21 +122,22 @@ test_view "${secret}"
 echo -e "${YELLOW}+++${NOC} Decrypt"
 "${HELM_CMD}" secrets dec "${secret}" > /dev/null || exit 1 && \
 test_decrypt "${secret}" && \
-cp "${secret_dec}" "${secret}"
+cp "${secret_dec}" "${secret_dec}.bak"
 
 echo -e "${YELLOW}+++${NOC} Cleanup Test"
 "${HELM_CMD}" secrets clean "$(dirname ${secret})" > /dev/null || exit 1
 mode="specified directory"
 test_clean "${secret}" "${mode}" && \
-cp "${secret}" "${secret_dec}" && \
+cp "${secret_dec}.bak" "${secret_dec}" && \
 "${HELM_CMD}" secrets clean "${secret_dec}" > /dev/null || exit 1
 mode="specified .dec file"
 test_clean "${secret}" "${secret_dec}" "${mode}" # && \
-# cp "${secret}" "${secret_dec}" && \
+# cp "${secret_dec}.bak" "${secret_dec}" && \
 # "${HELM_CMD}" secrets clean "${secret_dec}" > /dev/null || exit 1
 # mode="specified encrypted secret file"
 # test_clean "${secret}" "${mode}"
 # The functionality above doesn't work, it only works with .dec in filename
+rm "${secret_dec}.bak"
 
 echo -e "${YELLOW}+++${NOC} Once again Encrypt and Test"
 "${HELM_CMD}" secrets enc "${secret}" > /dev/null || exit 1 && \

@@ -24,7 +24,7 @@ then
     else
     	GNU_GETOPT=0
     fi
-    
+
     if [ "${GNU_GETOPT}" -ne 1 ]; then
     	cat <<EOF
 I’m sorry, "getopt --test" failed in this environment.
@@ -243,25 +243,58 @@ is_help() {
     esac
 }
 
+is_encrypted_secret() {
+  local file="$1"
+  [[ $(grep -C10000 'sops:' "$file" | grep -c 'version:') -gt 0 ]] && return
+}
+
+is_decrypted_secret() {
+  local filename_decrypted="$1"
+  filename_encrypted=$(sed -e "s/${DEC_SUFFIX}$/\\.yaml/" <<<"${filename_decrypted}")
+
+  if [ ! -f "${filename_encrypted}" ]; then
+    # try .yml extension instead
+    filename_encrypted=$(sed -e "s/${DEC_SUFFIX}$/\\.yml/" <<<"${filename_decrypted}")
+  fi
+
+  if [ -f "${filename_encrypted}" ]; then
+    is_encrypted_secret "${filename_encrypted}" && return
+  fi
+
+  false
+}
+
+get_decrypted_filename() {
+  local filename_encrypted="$1"
+  filename_decrypted=$(sed -e "s/\\.y\(a\|\)ml$/${DEC_SUFFIX}/" <<<"${filename_encrypted}")
+  if [[ "${filename_decrypted}" == *"${DEC_SUFFIX}"* ]]; then
+    eval "$2=${filename_decrypted}"
+  else
+    echo "Error: unable to derive decrypted filename for ${filename_encrypted}"
+    exit 1
+  fi
+}
+
 encrypt_helper() {
     local dir=$(dirname "$1")
     local yml=$(basename "$1")
     cd "$dir"
     [[ -e "$yml" ]] || { echo "File does not exist: $dir/$yml"; exit 1; }
-    local ymldec=$(sed -e "s/\\.y\(a\|\)ml$/${DEC_SUFFIX}/" <<<"$yml")
+    local ymldec=''
+    get_decrypted_filename "$yml" ymldec
     [[ -e $ymldec ]] || ymldec="$yml"
-    if [[ $(grep -C10000 'sops:' "$ymldec" | grep -c 'version:') -gt 0 ]]
+    if is_encrypted_secret "$ymldec"
     then
-	echo "Already encrypted: $ymldec"
-	return
+      echo "Already encrypted: $ymldec"
+      return
     fi
     if [[ $yml == $ymldec ]]
     then
-	sops --encrypt --input-type yaml --output-type yaml --in-place "$yml"
-	echo "Encrypted $yml"
+      sops --encrypt --input-type yaml --output-type yaml --in-place "$yml"
+      echo "Encrypted $yml"
     else
-	sops --encrypt --input-type yaml --output-type yaml "$ymldec" > "$yml"
-	echo "Encrypted $ymldec to $yml"
+      sops --encrypt --input-type yaml --output-type yaml "$ymldec" > "$yml"
+      echo "Encrypted $ymldec to $yml"
     fi
 }
 
@@ -288,36 +321,36 @@ decrypt_helper() {
 
     if [[ ${BASH_VERSINFO[0]} -lt 4 || ${BASH_VERSINFO[0]} -eq 4 && ${BASH_VERSINFO[1]} -lt 3 ]]
     then
-	local __ymldec_var='' __dec_var=''
-	[[ $# -ge 2 ]] && __ymldec_var=$2
-	[[ $# -ge 3 ]] && __dec_var=$3
-	[[ $__dec_var ]] && eval $__dec_var=0
+      local __ymldec_var='' __dec_var=''
+      [[ $# -ge 2 ]] && __ymldec_var=$2
+      [[ $# -ge 3 ]] && __dec_var=$3
+      [[ $__dec_var ]] && eval $__dec_var=0
     else
-	[[ $# -ge 2 ]] && local -n __ymldec=$2
-	[[ $# -ge 3 ]] && local -n __dec=$3
+      [[ $# -ge 2 ]] && local -n __ymldec=$2
+      [[ $# -ge 3 ]] && local -n __dec=$3
     fi
 
     __dec=0
     [[ -e "$yml" ]] || { echo "File does not exist: $yml"; exit 1; }
-    if [[ $(grep -C10000 'sops:' "$yml" | grep -c 'version:') -eq 0 ]]
+    if ! is_encrypted_secret "$yml"
     then
-	echo "Not encrypted: $yml"
-	__ymldec="$yml"
+      echo "Not encrypted: $yml"
+      __ymldec="$yml"
     else
-	__ymldec=$(sed -e "s/\\.y\(a\|\)ml$/${DEC_SUFFIX}/" <<<"$yml")
-	if [[ -e $__ymldec && $__ymldec -nt $yml ]]
-	then
-	    echo "$__ymldec is newer than $yml"
-	else
-	    sops --decrypt --input-type yaml --output-type yaml "$yml" > "$__ymldec" || { rm "$__ymldec"; exit 1; }
-	    __dec=1
-	fi
+      get_decrypted_filename "$yml" __ymldec
+      if [[ -e $__ymldec && $__ymldec -nt $yml ]]
+      then
+        echo "$__ymldec is newer than $yml"
+      else
+        sops --decrypt --input-type yaml --output-type yaml "$yml" > "$__ymldec" || { rm "$__ymldec"; exit 1; }
+        __dec=1
+      fi
     fi
 
     if [[ ${BASH_VERSINFO[0]} -lt 4 || ${BASH_VERSINFO[0]} -eq 4 && ${BASH_VERSINFO[1]} -lt 3 ]]
     then
-	[[ $__ymldec_var ]] && eval $__ymldec_var="'$__ymldec'"
-	[[ $__dec_var ]] && eval $__dec_var="'$__dec'"
+      [[ $__ymldec_var ]] && eval $__ymldec_var="'$__ymldec'"
+      [[ $__dec_var ]] && eval $__dec_var="'$__dec'"
     fi
     true # just so that decrypt_helper will exit with a true status on no error
 }
@@ -367,13 +400,20 @@ edit() {
 }
 
 clean() {
-    if is_help "$1"
+  if is_help "$1"
+  then
+    clean_usage
+    return
+  fi
+  local basedir="$1"
+
+  find "$basedir" -type f -name "*${DEC_SUFFIX}" -print0 | while read -d $'\0' ymldec
+  do
+    if is_decrypted_secret "$ymldec"
     then
-	clean_usage
-	return
+      rm -v $ymldec
     fi
-    local basedir="$1"
-    find "$basedir" -type f -name "*secret*${DEC_SUFFIX}" -exec rm -v {} \;
+  done
 }
 
 helm_wrapper() {
@@ -414,7 +454,7 @@ options='$options'
 longoptions='$longoptions'
 EOF
     fi
-    
+
     # parse command line
     local parsed # separate line, otherwise the return value of getopt is ignored
     # if parsing fails, getopt returns non-0, and the shell exits due to "set -e"
@@ -429,7 +469,7 @@ EOF
 	case "$1" in
 	    --)
 		# skip --, and what remains are the cmd args
-		shift 
+		shift
 		break
 		;;
             -f|--values)
@@ -439,8 +479,8 @@ EOF
 		if [[ $yml =~ ^=.*$ ]]; then
 		    yml="${yml/=/}"
 		fi
-		if [[ $yml =~ ^(.*/)?secrets(\.[^.]+)*\.yaml$ ]]
-		then
+    if is_encrypted_secret "$yml"
+    then
 		    decrypt_helper $yml ymldec decrypted
 		    cmdopts+=("$ymldec")
 		    [[ $decrypted -eq 1 ]] && decfiles+=("$ymldec")
