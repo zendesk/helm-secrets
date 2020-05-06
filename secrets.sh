@@ -248,9 +248,8 @@ encrypt_helper() {
     local yml=$(basename "$1")
     cd "$dir"
     [[ -e "$yml" ]] || { echo "File does not exist: $dir/$yml"; exit 1; }
-    local ymldec=$(sed -e "s/\\.yaml$/${DEC_SUFFIX}/" <<<"$yml")
+    local ymldec=$(sed -e "s/\\.y\(a\|\)ml$/${DEC_SUFFIX}/" <<<"$yml")
     [[ -e $ymldec ]] || ymldec="$yml"
-    
     if [[ $(grep -C10000 'sops:' "$ymldec" | grep -c 'version:') -gt 0 ]]
     then
 	echo "Already encrypted: $ymldec"
@@ -305,7 +304,7 @@ decrypt_helper() {
 	echo "Not encrypted: $yml"
 	__ymldec="$yml"
     else
-	__ymldec=$(sed -e "s/\\.yaml$/${DEC_SUFFIX}/" <<<"$yml")
+	__ymldec=$(sed -e "s/\\.y\(a\|\)ml$/${DEC_SUFFIX}/" <<<"$yml")
 	if [[ -e $__ymldec && $__ymldec -nt $yml ]]
 	then
 	    echo "$__ymldec is newer than $yml"
@@ -374,7 +373,7 @@ clean() {
 	return
     fi
     local basedir="$1"
-    find "$basedir" -type f -name "secrets*${DEC_SUFFIX}" -exec rm -v {} \;
+    find "$basedir" -type f -name "*secret*${DEC_SUFFIX}" -exec rm -v {} \;
 }
 
 helm_wrapper() {
