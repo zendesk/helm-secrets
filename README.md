@@ -1,9 +1,9 @@
 
-[![License](https://img.shields.io/github/license/futuresimple/helm-secrets.svg)](https://github.com/futuresimple/helm-secrets/blob/master/LICENSE)
-[![Current Release](https://img.shields.io/github/release/futuresimple/helm-secrets.svg)](https://github.com/futuresimple/helm-secrets/releases/latest)
-[![Production Ready](https://img.shields.io/badge/production-ready-green.svg)](https://github.com/futuresimple/helm-secrets/releases/latest)
-[![GitHub issues](https://img.shields.io/github/issues/futuresimple/helm-secrets.svg)](https://github.com/futuresimple/helm-secrets/issues)
-[![GitHub pull requests](https://img.shields.io/github/issues-pr/futuresimple/helm-secrets.svg?style=flat-square)](https://github.com/futuresimple/helm-secrets/pulls)
+[![License](https://img.shields.io/github/license/zendesk/helm-secrets.svg)](https://github.com/zendesk/helm-secrets/blob/master/LICENSE)
+[![Current Release](https://img.shields.io/github/release/zendesk/helm-secrets.svg)](https://github.com/zendesk/helm-secrets/releases/latest)
+[![Production Ready](https://img.shields.io/badge/production-ready-green.svg)](https://github.com/zendesk/helm-secrets/releases/latest)
+[![GitHub issues](https://img.shields.io/github/issues/zendesk/helm-secrets.svg)](https://github.com/zendesk/helm-secrets/issues)
+[![GitHub pull requests](https://img.shields.io/github/issues-pr/zendesk/helm-secrets.svg?style=flat-square)](https://github.com/zendesk/helm-secrets/pulls)
 
 # Plugin for secrets management in Helm
 
@@ -48,7 +48,7 @@ What kind of problems this plugin solves:
 ## Installation and Dependencies
 
 #### SOPS install
-Just install the plugin using ```helm plugin install https://github.com/futuresimple/helm-secrets``` and sops will be installed as part of it, using hook when helm > 2.3.x
+Just install the plugin using ```helm plugin install https://github.com/zendesk/helm-secrets``` and sops will be installed as part of it, using hook when helm > 2.3.x
 
 You can always install manually in MacOS as below:
 ```
@@ -68,11 +68,11 @@ More info on [sops page](https://github.com/mozilla/sops#showing-diffs-in-cleart
 
 As already described above,
 ```
-helm plugin install https://github.com/futuresimple/helm-secrets 
+helm plugin install https://github.com/zendesk/helm-secrets 
 ```
 
 #### For Pre Helm 2.3.0 Installation
-Get a release tarball from the [releases](https://github.com/futuresimple/helm-secrets/releases) page.
+Get a release tarball from the [releases](https://github.com/zendesk/helm-secrets/releases) page.
 
 Unpack the tarball in your helm plugins directory (```$(helm home)/plugins```).
 
