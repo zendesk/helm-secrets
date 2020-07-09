@@ -438,7 +438,7 @@ EOF
 		if [[ $yml =~ ^=.*$ ]]; then
 		    yml="${yml/=/}"
 		fi
-		if [[ $yml =~ ^(.*/)?secrets(\.[^.]+)*\.yaml$ ]]
+		if [[ $yml =~ ^(.*[/\\])?secrets(\.[^.]+)*\.yaml$ ]]
 		then
 		    decrypt_helper $yml ymldec decrypted
 		    cmdopts+=("$ymldec")
