@@ -2,11 +2,11 @@
 
 set -ueo pipefail
 
-SOPS_VERSION="3.0.4"
-SOPS_DEB_URL="https://github.com/mozilla/sops/releases/download/${SOPS_VERSION}/sops_${SOPS_VERSION}_amd64.deb"
-SOPS_DEB_SHA="9d9f319882ba05e7050be91bdfc396167ac9b00e2e6f634a647d55ac97915bb6"
-SOPS_LINUX_URL="https://github.com/mozilla/sops/releases/download/${SOPS_VERSION}/sops-${SOPS_VERSION}.linux"
-SOPS_LINUX_SHA="e185d2752defdcb18c054f67682a6684c72d6a6bf2341f6bef1dd7d33a110459"
+SOPS_VERSION="3.5.0"
+SOPS_DEB_URL="https://github.com/mozilla/sops/releases/download/v${SOPS_VERSION}/sops_${SOPS_VERSION}_amd64.deb"
+SOPS_DEB_SHA="27369eb0a50fd7c34f4a01fa8bbfee617a5883a83ad1118c377a21caf1a1a655"
+SOPS_LINUX_URL="https://github.com/mozilla/sops/releases/download/v${SOPS_VERSION}/sops-v${SOPS_VERSION}.linux"
+SOPS_LINUX_SHA="610fca9687d1326ef2e1a66699a740f5dbd5ac8130190275959da737ec52f096"
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
