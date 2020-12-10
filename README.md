@@ -5,6 +5,11 @@
 [![GitHub issues](https://img.shields.io/github/issues/zendesk/helm-secrets.svg)](https://github.com/zendesk/helm-secrets/issues)
 [![GitHub pull requests](https://img.shields.io/github/issues-pr/zendesk/helm-secrets.svg?style=flat-square)](https://github.com/zendesk/helm-secrets/pulls)
 
+# Deprecation information 
+
+Please note, this project is no longer being maintained.
+There is a active fork [jkroepke/helm-secrets](https://github.com/jkroepke/helm-secrets) and we will also contribute our changes to it. 
+
 # Plugin for secrets management in Helm
 
 Developed and used in all environments in [BaseCRM](https://getbase.com/).
