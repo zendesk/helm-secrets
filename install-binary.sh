@@ -83,3 +83,7 @@ else
     echo -e "${RED}[FAIL]${NOC} Install git command"
     exit 1
 fi
+
+echo "Deprecation Info"
+echo "  Please note, this project is no longer being maintained."
+echo "  Link to active helm-secret plugin could be found in helm documentation: https://helm.sh/docs/community/related/#helm-plugins"
