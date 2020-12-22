@@ -8,7 +8,7 @@
 # Deprecation information 
 
 Please note, this project is no longer being maintained.
-There is a active fork [jkroepke/helm-secrets](https://github.com/jkroepke/helm-secrets) and we will also contribute our future changes to it. 
+There is an active fork [jkroepke/helm-secrets](https://github.com/jkroepke/helm-secrets) and we will also contribute our future changes to it. 
 
 # Plugin for secrets management in Helm
 
