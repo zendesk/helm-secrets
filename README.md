@@ -1,5 +1,6 @@
 
 [![License](https://img.shields.io/github/license/zendesk/helm-secrets.svg)](https://github.com/zendesk/helm-secrets/blob/master/LICENSE)
+[![No Maintenance Intended](http://unmaintained.tech/badge.svg)](http://unmaintained.tech/)
 [![Current Release](https://img.shields.io/github/release/zendesk/helm-secrets.svg)](https://github.com/zendesk/helm-secrets/releases/latest)
 [![Production Ready](https://img.shields.io/badge/production-ready-green.svg)](https://github.com/zendesk/helm-secrets/releases/latest)
 [![GitHub issues](https://img.shields.io/github/issues/zendesk/helm-secrets.svg)](https://github.com/zendesk/helm-secrets/issues)
