@@ -3,6 +3,9 @@ version: "2.0.2"
 usage: "Secrets encryption in Helm for Git storing"
 description: |-
   This plugin provides secrets values encryption for Helm charts secure storing
+platformCommand:
+  - os: windows
+    command: bash.exe $HELM_PLUGIN_DIR/secrets.sh
 command: "$HELM_PLUGIN_DIR/secrets.sh"
 useTunnel: true
 hooks:
