@@ -243,10 +243,22 @@ is_help() {
     esac
 }
 
+find_sops() {
+   cd $(dirname "$1")
+   while [[ "$PWD" != "/" && ! -e ".sops.yaml" ]]; do
+       cd ..
+   done
+   [[ -e ".sops.yaml" ]] || { echo "Unable to find .sops.yaml"; exit 1; }
+   echo "$PWD"
+}
+
 encrypt_helper() {
-    local yml=$1
+    local sops_dir=$(find_sops "$1")
+    local yml=$(realpath --relative-to $(find_sops "$1") $(realpath "$1"))
     [[ -e "$yml" ]] || { echo "File does not exist: $yml"; exit 1; }
     local ymldec=$(sed -e "s/\\.yaml$/${DEC_SUFFIX}/" <<<"$yml")
+    cd "$sops_dir"
+
     [[ -e $ymldec ]] || ymldec="$yml"
 
     if [[ $(grep -C10000 'sops:' "$ymldec" | grep -c 'version:') -gt 0 ]]
@@ -283,6 +295,7 @@ enc() {
 # Name references ("declare -n" and "local -n") are a Bash 4.3+ feature.
 # For previous versions, work around using eval.
 decrypt_helper() {
+
     local yml="$1" __ymldec __dec
 
     if [[ ${BASH_VERSINFO[0]} -lt 4 || ${BASH_VERSINFO[0]} -eq 4 && ${BASH_VERSINFO[1]} -lt 3 ]]
@@ -308,7 +321,11 @@ decrypt_helper() {
 	then
 	    echo "$__ymldec is newer than $yml"
 	else
-	    sops --decrypt --input-type yaml --output-type yaml "$yml" > "$__ymldec" || { rm "$__ymldec"; exit 1; }
+            local sops_dir=$(find_sops "$1")
+            (yml=$(realpath --relative-to "$sops_dir" $(realpath "$yml"));
+             __ymldec=$(realpath --relative-to "$sops_dir" $(realpath "$__ymldec"));
+             cd "$sops_dir";
+	     sops --decrypt --input-type yaml --output-type yaml "$yml" > "$__ymldec" || { rm "$__ymldec"; exit 1; })
 	    __dec=1
 	fi
     fi
