@@ -72,6 +72,11 @@ More info on [sops page](https://github.com/mozilla/sops#showing-diffs-in-cleart
 
 #### Using Helm plugin manager (> 2.3.x)
 
+If you want to install it without root access it's necessary to set the environment variable `NOROOT` to `true`.
+```
+export NOROOT=true; heml plugin install https://github.com/futuresimple/helm-secrets
+```
+
 As already described above,
 ```
 helm plugin install https://github.com/zendesk/helm-secrets 
